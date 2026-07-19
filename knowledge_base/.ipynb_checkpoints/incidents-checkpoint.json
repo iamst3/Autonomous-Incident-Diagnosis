@@ -1,0 +1,58 @@
+[
+  {
+    "title": "Database connection pool exhaustion",
+    "symptoms": "DB timeout, connection pool exhausted, API latency high, HTTP 503, checkout-api unavailable, postgres max connections reached",
+    "root_cause": "Postgres connection pool exhausted due to retry storm, long-running queries, or insufficient pool size",
+    "fix": "Check active DB connections, terminate stale idle connections, restart affected API service, increase pool size carefully, scale API replicas, monitor p95 latency and 5xx rate",
+    "commands": "kubectl logs deployment/checkout-api; kubectl rollout restart deployment/checkout-api; kubectl scale deployment checkout-api --replicas=8"
+  },
+  {
+    "title": "CPU saturation due to retry storm",
+    "symptoms": "CPU above 90%, payment-service retry storm, high latency, elevated error rate, downstream pressure",
+    "root_cause": "Excessive retries causing CPU saturation and cascading downstream failures",
+    "fix": "Enable circuit breaker, reduce retry count, add exponential backoff, temporarily throttle traffic, monitor CPU and latency",
+    "commands": "kubectl top pods; kubectl logs deployment/payment-service"
+  },
+  {
+    "title": "Network packet loss affecting payment service",
+    "symptoms": "packet loss, payment-service unreachable, HTTP 504, gateway timeout, intermittent connectivity",
+    "root_cause": "Network packet loss or degraded route between gateway and payment-service",
+    "fix": "Check packet loss between gateway and payment-service, validate ingress and service mesh health, restart unhealthy pods, reroute traffic away from degraded node or zone, monitor 504 rate",
+    "commands": "kubectl get pods -o wide; kubectl describe svc payment-service; kubectl logs deployment/payment-service"
+  },
+  {
+    "title": "TLS certificate expired",
+    "symptoms": "TLS handshake failed, certificate expired, HTTPS requests failing, HTTP 502 at gateway, payment-service dependency call failed",
+    "root_cause": "Expired TLS certificate used by internal payment service endpoint",
+    "fix": "Renew expired certificate, update gateway or ingress secret, reload affected service, validate TLS handshake, monitor HTTP 502 rate",
+    "commands": "kubectl get secret; kubectl describe ingress; openssl s_client -connect payments.internal:443"
+  },
+  {
+    "title": "Memory leak causing OOM restart",
+    "symptoms": "memory usage above 95%, heap allocation continuously growing, OOM warning, pod restarted, service unavailable, latency increasing",
+    "root_cause": "Application memory leak or unbounded heap growth causing OOM restart",
+    "fix": "Capture heap profile, inspect memory growth, restart affected pods as mitigation, increase memory limit only temporarily, identify leaking code path, monitor restart count and latency",
+    "commands": "kubectl top pods; kubectl describe pod; kubectl logs --previous deployment/recommendation-service"
+  },
+  {
+    "title": "Input validation failure in payment API",
+    "symptoms": "NullPointerException, token missing, processTransaction failure, payment-api error",
+    "root_cause": "Missing input validation or null handling in payment transaction request",
+    "fix": "Validate required token before processing transaction, add safe null handling, return controlled 4xx error, add regression test, monitor payment-api exceptions",
+    "commands": "kubectl logs deployment/payment-api; kubectl describe deployment/payment-api"
+  },
+  {
+    "title": "Windows CBS manifest validation failure",
+    "symptoms": "CBS_E_MANIFEST_INVALID_ITEM, HRESULT 0x800f080d, Unrecognized packageExtended attribute, Failed to get next element, CBS_E_INVALID_PACKAGE, HRESULT 0x800f0805, WindowsUpdateAgent package failures, SQM upload failure",
+    "root_cause": "Invalid CBS manifest metadata or corrupted Windows servicing package metadata",
+    "fix": "Run DISM health scan, run SFC scan, inspect CBS.log for HRESULT errors, identify failed KB package IDs, avoid editing manifests directly, validate Windows Update health after scan",
+    "commands": "DISM /Online /Cleanup-Image /ScanHealth; DISM /Online /Cleanup-Image /CheckHealth; sfc /scannow; findstr /i \"error failed HRESULT\" C:\\Windows\\Logs\\CBS\\CBS.log"
+  },
+  {
+    "title": "Slow database queries",
+    "symptoms": "DB timeout, latency high, connection wait time increasing, slow query logs, API response delay",
+    "root_cause": "Missing index or inefficient query plan causing slow database queries and connection pile-up",
+    "fix": "Analyze slow queries, add missing index, tune query plan, increase timeout only temporarily, monitor connection wait time",
+    "commands": "kubectl logs deployment/checkout-api"
+  }
+]
